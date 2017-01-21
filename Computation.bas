@@ -95,7 +95,7 @@ Function Computation(STARTLAT, STARTLONG, ANGLE1, DISTANCE As Double) As String
 '                        A2 = 180 - Abs(A2)
 '                    End If
 '                End If
-     Computation = format(L2, "0.00000000") & "," & format(B2, "0.00000000")
+     Computation = Format(L2, "0.00000000") & "," & Format(B2, "0.00000000")
 End Function
 Private Function rad(ByVal angle_d As Double) As Double
     rad = angle_d * pi / 180
