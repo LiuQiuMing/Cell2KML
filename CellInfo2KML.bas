@@ -13,13 +13,14 @@ End Sub
 
 
 
+
 Sub BtnClick()
 
 Sheets(1).Range("E12").Value = ""
 Sheets(1).Range("E13").Value = ""
 
-Sheets(1).Range("F12").Value = ""
-Sheets(1).Range("F13").Value = ""
+Sheets(1).Range("E15").Value = ""
+
 
 If (Opt_Point) Then
     Call Point2KML
@@ -32,23 +33,21 @@ End Sub
 
 Sub Point2KML()
 
-'Dim headFile As String
+
 Dim tmpFile As String
 Dim outFile As String
 
-'headFile = ThisWorkbook.Path + "\headPoint.kml"
 tmpFile = ThisWorkbook.Path + "\tmp.kml"
 outFile = ThisWorkbook.Path + "\Point.kml"
 
 Dim lat, lon As Double
 Dim rows As Integer
+Dim columns As Integer
+
 Dim tmpStr As String
 
 If Dir(tmpFile) <> "" Then Kill (tmpFile)
 
-'Open headFile For Binary As #1
-'tmpStr = InputB(LOF(1), #1)
-'Close #1
 
 tmpStr = ""
 For i = 131 To 173
@@ -59,6 +58,7 @@ Open tmpFile For Binary As #2
 Put #2, , tmpStr
 
 rows = Sheets(2).UsedRange.rows.Count
+columns = Sheets(2).UsedRange.columns.Count
 
    
 
@@ -67,14 +67,13 @@ tmpStr = tmpStr + vbTab + vbTab + vbLf + "<name>基站</name>" + vbLf
 Put #2, , tmpStr
 tmpStr = ""
 
-Dim row As Integer
 
-row = 2
-Do While rows - 1 > 0
 
-    name = Sheets(2).Range("A" & row)
-    lon = Sheets(2).Range("B" & row)
-    lat = Sheets(2).Range("C" & row)
+For i = 2 To rows
+
+    name = Sheets(2).Range("A" & i)
+    lon = Sheets(2).Range("B" & i)
+    lat = Sheets(2).Range("C" & i)
     
     tmpStr = tmpStr + vbTab + vbTab + "<Placemark>" + vbLf
     tmpStr = tmpStr + vbTab + vbTab + vbTab + "<name>" + name + "</name>" + vbLf
@@ -86,12 +85,14 @@ Do While rows - 1 > 0
     
     tmpStr = tmpStr + vbTab + vbTab + vbTab + "</Point>" + vbLf
     tmpStr = tmpStr + vbTab + vbTab + "</Placemark>" + vbLf
-    row = row + 1
-    rows = rows - 1
-    Sheets(1).Range("E12").Value = "已完成" + CStr(row - 2) + "个坐标点"
+
+    Sheets(1).Range("E12").Value = "已完成" + CStr(i - 1) + "个坐标点"
+    
+
+    
     Put #2, , tmpStr
     tmpStr = ""
-Loop
+Next
 
 
 tmpStr = ""
@@ -131,6 +132,11 @@ Dim lat, lon, ang, radius As Double
 Dim name As String
 Dim bIO, bPwnDiv As Boolean
 
+Dim rows, columns As Integer
+
+rows = Sheets(2).UsedRange.rows.Count
+columns = Sheets(2).UsedRange.columns.Count
+
 Dim row As Integer
 Dim tmpStrInfo As String
 Dim tmpStrPolygon As String
@@ -169,7 +175,7 @@ tmpStr = tmpStr + vbTab + vbTab + vbTab + "</Style>" + vbLf
 Put #1, , tmpStr
 tmpStr = ""
 
-For i = 2 To Sheets(2).UsedRange.rows.Count
+For i = 2 To rows
 
     name = Sheets(2).Range("A" & i)
 
@@ -184,10 +190,25 @@ For i = 2 To Sheets(2).UsedRange.rows.Count
        GoTo Err
     End If
     ang = Sheets(2).Range("D" & i)
-    If IsNumeric(ang) = False Then
-        Sheets(1).Range("F12").Value = "第" + CStr(i - 1) + "行方位角错误"
-        GoTo Err
-    End If
+    
+        
+        Dim angles As Variant
+        Dim angCount As Variant
+        angles = Split(ang, "/")
+        angCount = UBound(angles)
+        Dim bAngle As Boolean
+        bAngle = True
+        For j = 0 To angCount
+            If (angles(j) < 0) Then bAngle = False
+            If (angles(j) > 360) Then bAngle = False
+            
+            bAngle = bAngle And (IsNumeric(angles(j)))
+        Next
+        If (bAngle = False) Then
+            Sheets(1).Range("F12").Value = "第" + CStr(i - 1) + "行方位角错误"
+            GoTo Err
+        End If
+    
     radius = Sheets(2).Range("F" & i)
     If IsNumeric(radius) = False Then
         Sheets(1).Range("F12").Value = "第" + CStr(i - 1) + "行半径错误"
@@ -196,28 +217,40 @@ For i = 2 To Sheets(2).UsedRange.rows.Count
 
 
     '小区信息处理
-    tmpStrInfo = vbTab + vbTab + "<Placemark>" + vbLf
-    tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + "<name>" + name + "</name>" + vbLf
-    tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + "<styleUrl>#msn_wht-blank</styleUrl>" + vbLf
-    tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + "<Point>" + vbLf
-    tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + vbTab + "<gx:drawOrder>1</gx:drawOrder>" + vbLf
-    strInOrOut = Sheets(2).Range("E" & i)
-    If (strInOrOut = "室内") Then
-        tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + vbTab + "<coordinates>" + CStr(lon) + "," + CStr(lat) + ",0 " + "</coordinates>" + vbLf
-    Else
-        tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + vbTab + "<coordinates>" + Computation.Computation(lat, lon, ang, 70) + ",0 " + "</coordinates>" + vbLf
-    End If
-    tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + "</Point>" + vbLf
-    tmpStrInfo = tmpStrInfo + vbTab + vbTab + "</Placemark>" + vbLf
-    Put #1, , tmpStrInfo
-    tmpStrInfo = ""
-    Sheets(1).Range("E12").Value = "已完成" + CStr(i - 1) + "个小区信息"
+    For j = 0 To angCount '小区有angCount个功分
     
+        tmpStrInfo = vbTab + vbTab + "<Placemark>" + vbLf
+        tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + "<name>" + name + "</name>" + vbLf
+        tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + "<styleUrl>#msn_wht-blank</styleUrl>" + vbLf
+        tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + "<Point>" + vbLf
+        tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + vbTab + "<gx:drawOrder>1</gx:drawOrder>" + vbLf
+        strInOrOut = Sheets(2).Range("E" & i)
+        If (strInOrOut = "室内" Or strInOrOut = "室分") Then
+            tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + vbTab + "<coordinates>" + CStr(lon) + "," + CStr(lat) + ",0 " + "</coordinates>" + vbLf
+            tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + "</Point>" + vbLf
+            tmpStrInfo = tmpStrInfo + vbTab + vbTab + "</Placemark>" + vbLf
+            Put #1, , tmpStrInfo
+            tmpStrInfo = ""
+            Exit For
+        Else
+            
+            tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + vbTab + "<coordinates>" + Computation.Computation(lat, lon, angles(j), 70) + ",0 " + "</coordinates>" + vbLf
+        End If
+        tmpStrInfo = tmpStrInfo + vbTab + vbTab + vbTab + "</Point>" + vbLf
+        tmpStrInfo = tmpStrInfo + vbTab + vbTab + "</Placemark>" + vbLf
+        Put #1, , tmpStrInfo
+        tmpStrInfo = ""
+        
+    Next
+    
+    Sheets(1).Range("E12").Value = "已完成" + CStr(i - 1) + "个小区信息"
+  
 Next
 
 tmpStr = ""
 tmpStr = tmpStr + vbTab + vbTab + "</Folder>" + vbLf
 Put #1, , tmpStr
+
 
 
 '增加小区图形Folder
@@ -226,7 +259,7 @@ tmpStr = tmpStr + vbTab + vbTab + "<Folder>" + vbLf
 tmpStr = tmpStr + vbTab + vbTab + vbTab + "<name>小区图形</name>" + vbLf
 Put #1, , tmpStr
 
-For i = 2 To Sheets(2).UsedRange.rows.Count
+For i = 2 To rows 'Sheets(2).UsedRange.rows.Count
 
     name = Sheets(2).Range("A" & i)
 
@@ -241,71 +274,123 @@ For i = 2 To Sheets(2).UsedRange.rows.Count
        GoTo Err
     End If
     ang = Sheets(2).Range("D" & i)
-    If IsNumeric(ang) = False Then
-        Sheets(1).Range("F12").Value = "第" + CStr(i - 1) + "行方位角错误"
-        GoTo Err
-    End If
+        'Dim angles As Variant
+        'Dim angCount As Variant
+        angles = Split(ang, "/")
+        angCount = UBound(angles)
+        'Dim bAngle As Boolean
+        bAngle = True
+        For j = 0 To angCount
+            If (angles(j) < 0) Then bAngle = False
+            If (angles(j) > 360) Then bAngle = False
+            
+            bAngle = bAngle And (IsNumeric(angles(j)))
+        Next
+        If (bAngle = False) Then
+            Sheets(1).Range("F12").Value = "第" + CStr(i - 1) + "行方位角错误"
+            GoTo Err
+        End If
     radius = Sheets(2).Range("F" & i)
+    
     If IsNumeric(radius) = False Then
         Sheets(1).Range("F12").Value = "第" + CStr(i - 1) + "行半径错误"
         GoTo Err
     End If
     '小区图形处理
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "<Placemark>" + vbLf
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "<name>" + name + "</name>" + vbLf
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "<description>"
-    tmpStrPolygon = tmpStrPolygon + "<![CDATA[<table border=1 width=360>"
-    tmpStrPolygon = tmpStrPolygon + "<tr><th>小区名称</th><th>经度</th><th>伟度</th></tr>"
-    tmpStrPolygon = tmpStrPolygon + "<tr><td>" + name + "</td><td>" + CStr(lon) + "</td><td>" + CStr(lat) + "</td></tr>"
-    tmpStrPolygon = tmpStrPolygon + "<tr><th>方位角</th><th>站点类型</th><th>半径</th></tr>"
-    tmpStrPolygon = tmpStrPolygon + "<tr><td>" + CStr(ang) + "</td><td>" + Sheets(2).Range("E" & i) + "</td><td>" + CStr(Sheets(2).Range("F" & i)) + "</td></tr>"
-    tmpStrPolygon = tmpStrPolygon + "</table>]]> " + "</description>" + vbLf
-
-    cellid = Sheets(2).Range("G" & i)
-    ID = cellid Mod 3
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "<styleUrl>#msn_ylw-pushpin" + CStr(ID) + "</styleUrl>" + vbLf
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "<Polygon>" + vbLf
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "<tessellate>1</tessellate>" + vbLf
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "<outerBoundaryIs>" + vbLf
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "<LinearRing>" + vbLf
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + vbTab + "<coordinates>" + vbLf
-
-    strInOrOut = Sheets(2).Range("E" & i)
-    radius = Sheets(2).Range("F" & i)
-    If (radius < 100) Then radius = 100
-    If (radius > 3000) Then radius = 3000
-
-    A1 = (ang - 30) Mod 360
-    A2 = (ang - 15) Mod 360
-    A3 = ang
-    A4 = (ang + 15) Mod 360
-    A5 = (ang + 30) Mod 360
-    If (strInOrOut = "室内") Then
-        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + vbTab
-        For j = 1 To 36
-            tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, j * 10 - 1, 30) + ",0 "
+    
+    For k = 0 To angCount '有angCount个功分，则画angCount个扇形
+    
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "<Placemark>" + vbLf
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "<name>" + name + "</name>" + vbLf
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "<description>"
+        tmpStrPolygon = tmpStrPolygon + "<![CDATA[<table border=1 width=650>"
+        Dim col As Integer
+        col = 1
+        For n = 1 To (Int(columns / 4))
+                   
+            tmpStrPolygon = tmpStrPolygon + "<tr><th>" + CStr(Sheets(2).Cells(1, col)) + "</th><th>" + CStr(Sheets(2).Cells(1, col + 1)) + "</th><th>" + CStr(Sheets(2).Cells(1, col + 2)) + "</th><th>" + CStr(Sheets(2).Cells(1, col + 3)) + "</th></tr>"
+            'tmpStrPolygon = tmpStrPolygon + "<tr><td>" + Sheets(2).Cells(2, col) + "</td><td>" + Sheets(2).Cells(2, col + 1) + "</td><td>" + Sheets(2).Cells(2, col + 2) + "</td><td>" + Sheets(2).Cells(2, col + 3) + "</td></tr>"
+            tmpStrPolygon = tmpStrPolygon + "<tr><td>" + CStr(Sheets(2).Cells(i, col)) + "</td><td>" + CStr(Sheets(2).Cells(i, col + 1)) + "</td><td>" + CStr(Sheets(2).Cells(i, col + 2)) + "</td><td>" + CStr(Sheets(2).Cells(i, col + 3)) + "</td></tr>"
+                       
+             col = col + 4
         Next
-        tmpStrPolygon = tmpStrPolygon + vbLf
-    Else
-            tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + vbTab + CStr(lon) + "," + CStr(lat) + "," + ",0 " '原点坐标
-            tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, A1, radius) + ",0 " '第一点
-            tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, A2, radius) + ",0 "
-            tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, A3, radius) + ",0 "
-            tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, A4, radius) + ",0 "
-            tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, A5, radius) + ",0 "
-            tmpStrPolygon = tmpStrPolygon + CStr(lon) + "," + CStr(lat) + "," + ",0 " '原点坐标
+        
+        tmpStrPolygon = tmpStrPolygon + "</table>]]> " + "</description>" + vbLf
+    
+        cellid = Sheets(2).Range("G" & i)
+        ID = cellid Mod 3
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "<styleUrl>#msn_ylw-pushpin" + CStr(ID) + "</styleUrl>" + vbLf
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "<Polygon>" + vbLf
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "<tessellate>1</tessellate>" + vbLf
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "<outerBoundaryIs>" + vbLf
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "<LinearRing>" + vbLf
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + vbTab + "<coordinates>" + vbLf
+    
+       
+        radius = Sheets(2).Range("F" & i)
+        coverType = Sheets(2).Range("H" & i)
+        Select Case coverType
+            Case "市区"
+                radius = radius * 25
+                
+            Case "郊区"
+                radius = radius * 50
+                
+            Case "农村"
+                radius = radius * 100
+            Case Else
+                radius = radius * 35
+        End Select
+        
+        'radius = radius * 40
+        If (radius < 100) Then radius = 100
+        If (radius > 3000) Then radius = 3000
+    
+        A1 = (angles(k) - 30) Mod 360
+        
+        A2 = (angles(k) - 15) Mod 360
+        A3 = angles(k)
+        A4 = (angles(k) + 15) Mod 360
+        A5 = (angles(k) + 30) Mod 360
+        
+        strInOrOut = Sheets(2).Range("E" & i)
+        If (strInOrOut = "室内" Or strInOrOut = "室分") Then
+            tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + vbTab
+            For j = 1 To 36
+                tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, j * 10 - 1, 30) + ",0 "
+            Next
             tmpStrPolygon = tmpStrPolygon + vbLf
-    End If
-
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + vbTab + "</coordinates>" + vbLf
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "</LinearRing>" + vbLf
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "</outerBoundaryIs>" + vbLf
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "</Polygon>" + vbLf
-    tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "</Placemark>" + vbLf
-    Put #1, , tmpStrPolygon
-    tmpStrPolygon = ""
+            tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + vbTab + "</coordinates>" + vbLf
+            tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "</LinearRing>" + vbLf
+            tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "</outerBoundaryIs>" + vbLf
+            tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "</Polygon>" + vbLf
+            tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "</Placemark>" + vbLf
+            Put #1, , tmpStrPolygon
+            tmpStrPolygon = ""
+            Exit For
+            
+        Else
+                tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + vbTab + CStr(lon) + "," + CStr(lat) + "," + ",0 " '原点坐标
+                tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, A1, radius) + ",0 " '第一点
+                tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, A2, radius) + ",0 "
+                tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, A3, radius) + ",0 "
+                tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, A4, radius) + ",0 "
+                tmpStrPolygon = tmpStrPolygon + Computation.Computation(lat, lon, A5, radius) + ",0 "
+                tmpStrPolygon = tmpStrPolygon + CStr(lon) + "," + CStr(lat) + "," + ",0 " '原点坐标
+                tmpStrPolygon = tmpStrPolygon + vbLf
+        End If
+    
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + vbTab + "</coordinates>" + vbLf
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "</LinearRing>" + vbLf
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + vbTab + "</outerBoundaryIs>" + vbLf
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "</Polygon>" + vbLf
+        tmpStrPolygon = tmpStrPolygon + vbTab + vbTab + vbTab + "</Placemark>" + vbLf
+        Put #1, , tmpStrPolygon
+        tmpStrPolygon = ""
+    Next
+    
     Sheets(1).Range("E13").Value = "已完成" + CStr(i - 1) + "个小区图形"
-
+   
 
 Next
 
@@ -321,9 +406,15 @@ tmpStr = tmpStr + "</kml>"
 Put #1, , tmpStr
 Close #1
 
+
+Sheets(1).Range("E15").Value = "正在写入KML文件…………"
+
 If Dir(outFile) <> "" Then Kill (outFile)
 Call FileZM(tmpFile, "GB2312", outFile, "utf-8")
 If Dir(tmpFile) <> "" Then Kill (tmpFile)
+
+Sheets(1).Range("E15").Value = "写入KML文件完成"
+
 Err:
     Close #1
 End Sub
